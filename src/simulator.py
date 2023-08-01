@@ -6,6 +6,9 @@
 # Designed by Neda Motamediraad, Graduate Teaching Assistant
 # github.com/nedaraad/TinyProcessorSimulator
 # under MIT licence
+import curses.ascii
+from curses.ascii import isalpha
+
 
 class TinyBASUSimulator:
     def __init__(self, prediction_method):
@@ -21,55 +24,121 @@ class TinyBASUSimulator:
 
     def parse_instruction(self, asm_file):
         machine_codes = []
+
+        func = {
+            'add': 0b001,
+            'sub': 0b010,
+            'slt': 0b100
+        }
+        i_opcodes = {
+            'addi': 0b0001,
+            'li': 0b0010,
+            'lui': 0b0011,
+            'lw': 0b0100,
+            'sw': 0b0101,
+            'beq': 0b1010,
+            'bne': 0b1011
+        }
+        j_opcode = {
+            'jmp': 0b1110,
+            'jal': 0b1111
+        }
+
         with open(asm_file, 'r') as file:
             lines = file.readlines()
+            labels = {}
+
             for cnt, line in enumerate(lines):
                 instruction = 0x0000
-                labels = {}
-                fields = line.strip().split(',')
+                fields = line.strip().split(', ')
+                label = fields[0]
+                fields.pop(0)
+                fields = label.strip().split(' ') + fields
                 nf = len(fields)
                 if fields[0][-1] == ':':  # branch label
-                    labels[fields[0]] = cnt
-                else:
-                    # example for R-Format instructions
-                    if fields[0] == 'add':
-                        opcode = 0
-                        rd = int(fields[1][2:]) if nf > 2 else 0
-                        rs = int(fields[2][2:]) if nf > 1 else 0
-                        rt = int(fields[3][2:]) if nf > 3 else 0
-                        func = 0
-                        instruction += (opcode << 12) & 0xF000
-                        instruction += (rd << 9) & 0x0700
-                        instruction += (rs << 6) & 0x0070
-                        instruction += (rt << 3) & 0x0070
-                        instruction += func & 0x0007
-                        machine_codes.append(instruction)
+                    if fields[0][:-1] in labels.keys() and -1 in labels[fields[0][:-1]]:
+                        labels[fields[0][:-1]].remove(-1)
+                        for address in labels[fields[0][:-1]]:
+                            previous_instruction = machine_codes[address]
+                            opcode = (previous_instruction & 0xf000) >> 12
+                            # editing instructions with the label specified
+                            instruction = (opcode << 12) & 0xF000
+                            if opcode in [13, 14]:  # jmp or jal
+                                imm = cnt & 0xFFFF
+                                instruction += imm & 0x0FFF
+                                machine_codes[address] = instruction
+                            elif opcode in [10, 11]:  # beq or bne
+                                rd = (previous_instruction & 0x0E00) >> 9
+                                rs = (previous_instruction & 0x01C0) >> 6
 
-                    # example for I-Format instructions
-                    elif fields[0] == 'addi':
-                        opcode = 1
-                        rd = int(fields[1][2:]) if nf > 1 else 0
-                        rs = int(fields[2][2:]) if nf > 1 else 0
-                        imm = int(fields[3]) if nf > 1 else 0
-                        instruction += (opcode << 12) & 0xF000
-                        instruction += (rd << 9) & 0x0700
-                        instruction += (rs << 6) & 0x0070
-                        instruction += imm
-                        machine_codes.append(instruction)
+                                instruction += int(cnt) & 0x003F
+                                instruction += (rd << 9) & 0x0e00
+                                instruction += (rs << 6) & 0x01c0
+                                machine_codes[address] = instruction
 
-                    # example for J-Format instructions
-                    elif fields[0][0:3] == 'jmp':
-                        opcode = 0b1110
+                    labels[fields[0][:-1]] = cnt
+                    fields.pop(0)
+                instruction = 0x0000
+                if fields[0] in ['add', 'sub', 'slt']:
+                    opcode = 0
+                    rd = int(fields[1][2:]) if nf > 2 else 0
+                    rs = int(fields[2][2:]) if nf > 1 else 0
+                    rt = int(fields[3][2:]) if nf > 3 else 0
+                    funct = func[fields[0]]
+                    instruction += (opcode << 12) & 0xF000
+                    instruction += (rd << 9) & 0x0E00
+                    instruction += (rs << 6) & 0x01C0
+                    instruction += (rt << 3) & 0x0038
+                    instruction += funct & 0x0007
+                    machine_codes.append(instruction)
+                elif fields[0] in ['addi', 'beq', 'bne', 'sw', 'lw']:
+                    opcode = i_opcodes[fields[0]]
+                    rd = int(fields[1][2:]) if nf > 1 else 0
+                    rs = int(fields[2][2:]) if nf > 1 else 0
 
-                        if fields[0][3:].isdigit():
-                            imm = int(fields[0][3:].strip())
-                        else:
-                            imm = int(labels[fields[0][3:].strip()])
-                        instruction += (opcode << 12) & 0xF000
-                        instruction += imm & 0x0FFF
-                        machine_codes.append(instruction)
+                    imm = fields[3] if nf > 1 else 0
+
+                    if fields[0] in ['beq', 'bne'] and all(curses.ascii.isalpha(c) for c in imm):
+                        try:
+                            if fields[-1].strip() in labels.keys():
+                                imm = labels[fields[-1].strip()]
+                            else:
+                                labels[fields[-1].strip()] = [-1, cnt]
+                                imm = 0
+
+                        except KeyError:
+                            return print("Wrong asm code, label has not been defined")
+
+                    instruction += (opcode << 12) & 0xF000
+                    instruction += (rd << 9) & 0x0E00
+                    instruction += (rs << 6) & 0x01C0
+                    instruction += int(imm) & 0x003F
+                    machine_codes.append(instruction)
+                elif fields[0] in ['li', 'lui']:
+                    opcode = i_opcodes[fields[0]]
+                    rd = int(fields[1][2:]) if nf > 1 else 0
+                    imm = int(fields[2]) if nf > 1 else 0
+                    instruction += (opcode << 12) & 0xF000
+                    instruction += (rd << 9) & 0x0E00
+                    instruction += imm
+                    machine_codes.append(instruction)
+                elif fields[0] in ['jmp', 'jal']:
+                    opcode = j_opcode[fields[0]]
+                    if fields[-1].isdigit():
+                        imm = int(fields[-1].strip())
                     else:
-                        machine_codes.append(0x0000)
+                        if fields[-1].strip() in labels.keys():
+                            imm = int(labels[fields[-1].strip()])
+                        else:
+                            labels[fields[-1].strip()] = [-1, cnt]
+                            # tavakol bar khoda
+                            imm = 0
+
+                    instruction += (opcode << 12) & 0xF000
+                    instruction += imm & 0x0FFF
+                    machine_codes.append(instruction)
+                else:
+                    machine_codes.append(0x0000)
 
             for address, inst in enumerate(machine_codes):
                 self.memory[address] = inst
