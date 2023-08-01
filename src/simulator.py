@@ -8,6 +8,7 @@
 # under MIT licence
 import curses.ascii
 from curses.ascii import isalpha
+from typing import Iterable
 
 
 class TinyBASUSimulator:
@@ -49,7 +50,6 @@ class TinyBASUSimulator:
             labels = {}
 
             for cnt, line in enumerate(lines):
-                instruction = 0x0000
                 fields = line.strip().split(', ')
                 label = fields[0]
                 fields.pop(0)
@@ -59,6 +59,7 @@ class TinyBASUSimulator:
                     if fields[0][:-1] in labels.keys() and -1 in labels[fields[0][:-1]]:
                         labels[fields[0][:-1]].remove(-1)
                         for address in labels[fields[0][:-1]]:
+                            print(address)
                             previous_instruction = machine_codes[address]
                             opcode = (previous_instruction & 0xf000) >> 12
                             # editing instructions with the label specified
@@ -99,15 +100,25 @@ class TinyBASUSimulator:
                     imm = fields[3] if nf > 1 else 0
 
                     if fields[0] in ['beq', 'bne'] and all(curses.ascii.isalpha(c) for c in imm):
-                        try:
-                            if fields[-1].strip() in labels.keys():
+                        # try:
+                        if fields[-1].strip() in labels.keys():
+                            if isinstance(labels[fields[-1].strip()], Iterable):
+                                # imm = labels[fields[-1].strip()][1]
+
+                                labels[fields[-1].strip()].append(cnt)
+                                imm = 0
+                            else:
                                 imm = labels[fields[-1].strip()]
+                        else:
+                            if fields[-1].strip() in labels.keys():
+                                if isinstance(labels[fields[-1].strip()], Iterable):
+                                    labels[fields[-1].strip()].append(cnt)
                             else:
                                 labels[fields[-1].strip()] = [-1, cnt]
                                 imm = 0
 
-                        except KeyError:
-                            return print("Wrong asm code, label has not been defined")
+                        # except KeyError:
+                        #     return print("Wrong asm code, label has not been defined")
 
                     instruction += (opcode << 12) & 0xF000
                     instruction += (rd << 9) & 0x0E00
@@ -128,10 +139,18 @@ class TinyBASUSimulator:
                         imm = int(fields[-1].strip())
                     else:
                         if fields[-1].strip() in labels.keys():
-                            imm = int(labels[fields[-1].strip()])
+                            if isinstance(labels[fields[-1].strip()], Iterable):
+                                # imm = labels[fields[-1].strip()][1]
+                                labels[fields[-1].strip()].append(cnt)
+                                imm = 0
+                            else:
+                                imm = labels[fields[-1].strip()]
                         else:
-                            labels[fields[-1].strip()] = [-1, cnt]
-                            # tavakol bar khoda
+                            if fields[-1].strip() in labels.keys():
+                                if isinstance(labels[fields[-1].strip()], Iterable):
+                                    labels[fields[-1].strip()].append(cnt)
+                            else:
+                                labels[fields[-1].strip()] = [-1, cnt]
                             imm = 0
 
                     instruction += (opcode << 12) & 0xF000
@@ -142,6 +161,7 @@ class TinyBASUSimulator:
 
             for address, inst in enumerate(machine_codes):
                 self.memory[address] = inst
+                print(inst)
 
     def init_memory(self, data_file):
         # Initialize the memory with content from a files
