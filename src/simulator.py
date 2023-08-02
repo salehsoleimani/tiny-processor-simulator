@@ -377,16 +377,20 @@ class TinyBASUSimulator:
 
             opcode, rd, rs, rt, func, i_imm, j_imm = self.decode(instruction)
 
+            if opcode == 14:
+                print("OK")
+
             if opcode == 10 or opcode == 11:  # implement prediction
                 # Branch instruction
                 predicted_result = self.branch_prediction(instruction)
                 if predicted_result:
                     # Taken branch
-                    self.pc += i_imm
+                    print(self.pc)
+                    self.pc += i_imm -1
                 else:
                     # Not Taken branch
                     # Execute the instruction
-                    self.calculate_stalls()  # Calculate stalls before executing the instruction
+                    # self.calculate_stalls()  # Calculate stalls before executing the instruction
                     self.execute(instruction)
                     # Update performance metrics
                     self.num_cycles += 1
@@ -397,11 +401,10 @@ class TinyBASUSimulator:
                 actual_result = self.pc == (self.pc - 1) + i_imm
                 self.update_branch_prediction(opcode, rs, rt, actual_result)
             else:
-                self.calculate_stalls()  # Calculate stalls before executing the instruction
+                # self.calculate_stalls()  # Calculate stalls before executing the instruction
                 self.execute(instruction)
                 self.num_cycles += 1
                 self.num_instructions += 1
-
 
         self.runtime = (time.time() - start) * 1000
 
@@ -410,10 +413,10 @@ class TinyBASUSimulator:
 
         num_correct_predictions = self.num_instructions - self.num_stalls
         prediction_accuracy = (
-                                          num_correct_predictions / self.num_instructions) * 100 if self.num_instructions > 0 else 0
+                                      num_correct_predictions / self.num_instructions) * 100 if self.num_instructions > 0 else 0
 
         speedup = self.num_cycles / (self.num_cycles + self.num_stalls) if (
-                                                                                       self.num_cycles + self.num_stalls) > 0 else 0
+                                                                                   self.num_cycles + self.num_stalls) > 0 else 0
 
         with open(report_file, 'w') as file:
             file.write('tiny processor report file\n')
