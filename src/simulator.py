@@ -1,14 +1,16 @@
-#!/usr/bin/env python
-#
-# Computer Engineering Department, Bu-Ali University, Hamadan, Iran
-# Computer Architecture Final Project Template
-# Course supervisor and Instructor: Dr. M. Abbasi
-# Designed by Neda Motamediraad, Graduate Teaching Assistant
-# github.com/nedaraad/TinyProcessorSimulator
-# under MIT licence
 import curses.ascii
-from curses.ascii import isalpha
+import time
 from typing import Iterable
+
+
+def time_func(func):
+    def wrapper(*args, **kwargs):
+        start = time.time()
+        func(*args, **kwargs)
+        end = time.time()
+        print(f"elapsed time: {(end - start) * 1000:.3f}ms")
+
+    return wrapper()
 
 
 class TinyBASUSimulator:
@@ -100,25 +102,25 @@ class TinyBASUSimulator:
                     imm = fields[3] if nf > 1 else 0
 
                     if fields[0] in ['beq', 'bne'] and all(curses.ascii.isalpha(c) for c in imm):
-                        # try:
-                        if fields[-1].strip() in labels.keys():
-                            if isinstance(labels[fields[-1].strip()], Iterable):
-                                # imm = labels[fields[-1].strip()][1]
-
-                                labels[fields[-1].strip()].append(cnt)
-                                imm = 0
-                            else:
-                                imm = labels[fields[-1].strip()]
-                        else:
+                        try:
                             if fields[-1].strip() in labels.keys():
                                 if isinstance(labels[fields[-1].strip()], Iterable):
-                                    labels[fields[-1].strip()].append(cnt)
-                            else:
-                                labels[fields[-1].strip()] = [-1, cnt]
-                                imm = 0
+                                    # imm = labels[fields[-1].strip()][1]
 
-                        # except KeyError:
-                        #     return print("Wrong asm code, label has not been defined")
+                                    labels[fields[-1].strip()].append(cnt)
+                                    imm = 0
+                                else:
+                                    imm = labels[fields[-1].strip()]
+                            else:
+                                if fields[-1].strip() in labels.keys():
+                                    if isinstance(labels[fields[-1].strip()], Iterable):
+                                        labels[fields[-1].strip()].append(cnt)
+                                else:
+                                    labels[fields[-1].strip()] = [-1, cnt]
+                                    imm = 0
+
+                        except KeyError:
+                            return print("Wrong asm code, label has not been defined")
 
                     instruction += (opcode << 12) & 0xF000
                     instruction += (rd << 9) & 0x0E00
@@ -188,8 +190,8 @@ class TinyBASUSimulator:
 
     def execute(self, instruction):
         opcode, rd, rs, rt, func, i_imm, j_imm = instruction
-        if opcode == 0:
 
+        if opcode == 0:
             if func == 1:  # add
                 self.regs[rd] = self.regs[rs] + self.regs[rt]  # add rd, rs, rt
 
@@ -200,32 +202,38 @@ class TinyBASUSimulator:
                 self.regs[rd] = 1 if self.regs[rs] < self.regs[rt] else 0
 
         elif opcode == 1:  # addi
-            self.regs[rd] = self.regs[rs] + i_imm  # addi rd, rs, imm
+            self.regs[rd] = self.regs[rs] + int(i_imm)  # addi rd, rs, imm
 
         elif opcode == 2:  # li: load immediate
             self.regs[rd] = int(i_imm)  # li rd, imm
 
-        elif opcode == 2:  # li: load upper immediate
-            self.regs[rd] = int(i_imm) << 12  # lui rd, imm
+        elif opcode == 3:  # lui: load upper immediate
+            self.regs[rd] = int(i_imm) << 10  # lui rd, imm
 
         elif opcode == 4:  # lw: load word
-            self.regs[rd] = self.memory[self.regs[rs] + i_imm]
+            self.regs[rd] = self.memory[self.regs[rs] + int(i_imm)]
 
         elif opcode == 5:  # sw: store word
-            self.memory[self.regs[rs] + i_imm] = self.regs[rd]
+            self.memory[self.regs[rs] + int(i_imm)] = self.regs[rd]
 
         elif opcode == 0b1110:  # jmp to location
-            self.pc = self.pc + j_imm
+            self.pc += int(j_imm)
 
-        elif opcode == 0b1111:  # jmp to location
-            self.regs[15] = self.pc
-            self.pc = self.pc + j_imm
+        elif opcode == 0b1111:  # jal to location
+            self.pc += int(j_imm)
+            self.regs[7] = self.pc
 
         elif opcode == 0x1010:  # branch equal
-            pass
+            if self.regs[rs] == self.regs[rt]:  # beq rd, rs, imm
+                self.pc += int(i_imm)
+            else:
+                self.pc += 1
 
-        elif opcode == 0x1010:  # branch not equal
-            pass
+        elif opcode == 0x1011:  # branch not equal
+            if self.regs[rs] != self.regs[rt]:  # bne rd, rs, imm
+                self.pc += int(i_imm)
+            else:
+                self.pc += 1
 
     def branch_prediction(self, instruction):
         # Perform branch prediction based on the selected method
@@ -237,6 +245,8 @@ class TinyBASUSimulator:
         elif self.prediction_method == 'D1':
             if instruction[0] == '.....':
                 return self.BPT['key']
+        elif self.prediction_method == 'D2':
+            pass
         else:
             pass
 
@@ -246,6 +256,7 @@ class TinyBASUSimulator:
             key = (opcode, rs, rt)
             self.BPT[key] = actual_result
 
+    @time_func
     def run(self, timeout):
         while True:
             if self.num_cycles > timeout:
@@ -283,6 +294,8 @@ class TinyBASUSimulator:
         # Print the performance metrics
         print("Performance Metrics:")
         print("Number of Cycles:", self.num_cycles)
+        print("Number of Instructions:", self.num_instructions)
+
         with open(report_file, 'w') as file:
             file.write('Some Report Text')
 
