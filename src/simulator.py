@@ -60,14 +60,15 @@ class TinyBASUSimulator:
                             # editing instructions with the label specified
                             instruction = (opcode << 12) & 0xF000
                             if opcode in [13, 14]:  # jmp or jal
-                                imm = cnt & 0xFFFF
+                                # store the difference between addresses to jump
+                                imm = (cnt - address - 1) & 0xFFFF
                                 instruction += imm & 0x0FFF
                                 machine_codes[address] = instruction
                             elif opcode in [10, 11]:  # beq or bne
                                 rd = (previous_instruction & 0x0E00) >> 9
                                 rs = (previous_instruction & 0x01C0) >> 6
-
-                                instruction += int(cnt) & 0x003F
+                                # store the difference between addresses to jump
+                                instruction += int(cnt - address - 1) & 0x003F
                                 instruction += (rd << 9) & 0x0e00
                                 instruction += (rs << 6) & 0x01c0
                                 machine_codes[address] = instruction
@@ -94,26 +95,25 @@ class TinyBASUSimulator:
 
                     imm = fields[3] if nf > 1 else 0
 
-                    if fields[0] in ['beq', 'bne'] and all(curses.ascii.isalpha(c) for c in imm):
+                    if fields[0] in ['beq', 'bne'] and not imm.isdigit():
                         try:
                             if fields[-1].strip() in labels.keys():
                                 if isinstance(labels[fields[-1].strip()], Iterable):
-                                    # imm = labels[fields[-1].strip()][1]
-
+                                    # if label has been defined after instruction
+                                    # and another instruction before this instruction have used this label too
                                     labels[fields[-1].strip()].append(cnt)
                                     imm = 0
                                 else:
-                                    imm = labels[fields[-1].strip()]
+                                    # if label is defined before this instruction
+                                    # store the difference between addresses to jump
+                                    imm = labels[fields[-1].strip()] - cnt + 1
                             else:
-                                if fields[-1].strip() in labels.keys():
-                                    if isinstance(labels[fields[-1].strip()], Iterable):
-                                        labels[fields[-1].strip()].append(cnt)
-                                else:
-                                    labels[fields[-1].strip()] = [-1, cnt]
-                                    imm = 0
+                                # if label has been defined after instruction
+                                labels[fields[-1].strip()] = [-1, cnt]
+                                imm = 0
 
                         except KeyError:
-                            return print("Wrong asm code, label has not been defined")
+                            return print("Wrong asm code, label has not been defined!")
 
                     instruction += (opcode << 12) & 0xF000
                     instruction += (rd << 9) & 0x0E00
@@ -135,17 +135,12 @@ class TinyBASUSimulator:
                     else:
                         if fields[-1].strip() in labels.keys():
                             if isinstance(labels[fields[-1].strip()], Iterable):
-                                # imm = labels[fields[-1].strip()][1]
                                 labels[fields[-1].strip()].append(cnt)
                                 imm = 0
                             else:
-                                imm = labels[fields[-1].strip()]
+                                imm = labels[fields[-1].strip()] - cnt + 1
                         else:
-                            if fields[-1].strip() in labels.keys():
-                                if isinstance(labels[fields[-1].strip()], Iterable):
-                                    labels[fields[-1].strip()].append(cnt)
-                            else:
-                                labels[fields[-1].strip()] = [-1, cnt]
+                            labels[fields[-1].strip()] = [-1, cnt]
                             imm = 0
 
                     instruction += (opcode << 12) & 0xF000
@@ -211,6 +206,7 @@ class TinyBASUSimulator:
 
         elif opcode == 0b1110:  # jmp to location
             self.pc += int(j_imm)
+            print(self.pc)
 
         elif opcode == 0b1111:  # jal to location
             self.pc += int(j_imm)
@@ -377,7 +373,8 @@ class TinyBASUSimulator:
 
             opcode, rd, rs, rt, func, i_imm, j_imm = self.decode(instruction)
 
-            if opcode == 14:
+            print("asd")
+            if opcode == 11:
                 print("OK")
 
             if opcode == 10 or opcode == 11:  # implement prediction
@@ -386,7 +383,7 @@ class TinyBASUSimulator:
                 if predicted_result:
                     # Taken branch
                     print(self.pc)
-                    self.pc += i_imm -1
+                    self.pc += i_imm
                 else:
                     # Not Taken branch
                     # Execute the instruction
