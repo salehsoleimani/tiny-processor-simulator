@@ -252,6 +252,20 @@ class TinyBASUSimulator:
                 return True
             elif prediction in ('SNT', 'WNT'):
                 return False
+        elif self.prediction_method == '3BIT':
+            opcode, rd, rs, rt, func, i_imm, j_imm = self.decode(instruction)
+            key = (opcode, rs, rt)
+
+            if key not in self.BPT:
+                self.BPT[key] = 'WT'  # Initialize to Weakly Taken
+
+            prediction = self.BPT[key]
+
+            # Predict based on the current state of the counter
+            if prediction in ('ST', 'ST_INV', 'WT', 'WT_INV'):
+                return True
+            elif prediction in ('SNT', 'SNT_INV', 'WNT', 'WNT_INV'):
+                return False
         else:
             pass
 
@@ -279,6 +293,49 @@ class TinyBASUSimulator:
                     self.BPT[key] = 'WT'
                 elif prediction == 'WT':
                     self.BPT[key] = 'WNT'
+        elif self.prediction_method == '3BIT':
+            key = (opcode, rs, rt)
+
+            if key not in self.BPT:
+                self.BPT[key] = 'WT'  # Initialize to Weakly Taken
+
+            prediction = self.BPT[key]
+
+            # Update the counter based on the actual result
+            if actual_result:
+                if prediction == 'ST':
+                    self.BPT[key] = 'ST'
+                elif prediction == 'ST_INV':
+                    self.BPT[key] = 'ST'
+                elif prediction == 'WT':
+                    self.BPT[key] = 'ST'
+                elif prediction == 'WT_INV':
+                    self.BPT[key] = 'ST_INV'
+                elif prediction == 'WNT':
+                    self.BPT[key] = 'WT'
+                elif prediction == 'WNT_INV':
+                    self.BPT[key] = 'WT_INV'
+                elif prediction == 'SNT':
+                    self.BPT[key] = 'WNT'
+                elif prediction == 'SNT_INV':
+                    self.BPT[key] = 'WNT_INV'
+            else:
+                if prediction == 'ST':
+                    self.BPT[key] = 'ST_INV'
+                elif prediction == 'ST_INV':
+                    self.BPT[key] = 'WNT_INV'
+                elif prediction == 'WT':
+                    self.BPT[key] = 'WT_INV'
+                elif prediction == 'WT_INV':
+                    self.BPT[key] = 'SNT_INV'
+                elif prediction == 'WNT':
+                    self.BPT[key] = 'WNT_INV'
+                elif prediction == 'WNT_INV':
+                    self.BPT[key] = 'SNT_INV'
+                elif prediction == 'SNT':
+                    self.BPT[key] = 'SNT_INV'
+                elif prediction == 'SNT_INV':
+                    self.BPT[key] = 'SNT_INV'
 
     def run(self, timeout):
         start = time.time()
