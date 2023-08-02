@@ -3,17 +3,8 @@ import time
 from typing import Iterable
 
 
-def time_func(func):
-    def wrapper(*args, **kwargs):
-        start = time.time()
-        func(*args, **kwargs)
-        end = time.time()
-        print(f"elapsed time: {(end - start) * 1000:.3f}ms")
-
-    return wrapper()
-
-
 class TinyBASUSimulator:
+
     def __init__(self, prediction_method):
 
         self.regs = [0] * 8  # Initialize the registers
@@ -24,6 +15,8 @@ class TinyBASUSimulator:
         self.num_stalls = 0
         self.prediction_method = prediction_method
         self.BPT = None  # Branch Prediction Table
+
+        self.runtime = 0
 
     def parse_instruction(self, asm_file):
         machine_codes = []
@@ -189,7 +182,7 @@ class TinyBASUSimulator:
         return opcode, rd, rs, rt, func, i_imm, j_imm
 
     def execute(self, instruction):
-        opcode, rd, rs, rt, func, i_imm, j_imm = instruction
+        opcode, rd, rs, rt, func, i_imm, j_imm = self.decode(instruction)
 
         if opcode == 0:
             if func == 1:  # add
@@ -239,25 +232,56 @@ class TinyBASUSimulator:
         # Perform branch prediction based on the selected method
         if self.prediction_method == 'ST':
             return True
-
         elif self.prediction_method == 'SN':
             return False
         elif self.prediction_method == 'D1':
-            if instruction[0] == '.....':
-                return self.BPT['key']
+            opcode, rd, rs, rt, func, i_imm, j_imm = self.decode(instruction)
+            key = (opcode, rs, rt)
+            return self.BPT.get(key, True)
         elif self.prediction_method == 'D2':
-            pass
+            opcode, rd, rs, rt, func, i_imm, j_imm = self.decode(instruction)
+            key = (opcode, rs, rt)
+
+            if key not in self.BPT:
+                self.BPT[key] = 'WT'  # Initialize to Weakly Taken
+
+            prediction = self.BPT[key]
+
+            # Predict based on the current state of the counter
+            if prediction in ('ST', 'WT'):
+                return True
+            elif prediction in ('SNT', 'WNT'):
+                return False
         else:
             pass
 
     def update_branch_prediction(self, opcode, rs, rt, actual_result):
         # Update the branch prediction table with the actual result
-        if self.prediction_method == 'dynamic ...':
+        if self.prediction_method == 'D1':
             key = (opcode, rs, rt)
             self.BPT[key] = actual_result
+        elif self.prediction_method == 'D2':
+            key = (opcode, rs, rt)
 
-    @time_func
+            if key not in self.BPT:
+                self.BPT[key] = 'WT'  # Initialize to Weakly Taken
+
+            prediction = self.BPT[key]
+
+            # Update the counter based on the actual result
+            if actual_result:
+                if prediction == 'WT':
+                    self.BPT[key] = 'ST'
+                elif prediction == 'WNT':
+                    self.BPT[key] = 'WT'
+            else:
+                if prediction == 'ST':
+                    self.BPT[key] = 'WT'
+                elif prediction == 'WT':
+                    self.BPT[key] = 'WNT'
+
     def run(self, timeout):
+        start = time.time()
         while True:
             if self.num_cycles > timeout:
                 print('timeout for executing program! Something has bug')
@@ -278,7 +302,6 @@ class TinyBASUSimulator:
                     self.pc += i_imm
                 else:
                     # Not Taken branch
-                    pass
                     # Execute the instruction
                     self.execute(instruction)
                     # Update performance metrics
@@ -289,6 +312,12 @@ class TinyBASUSimulator:
                 # Branch instruction
                 actual_result = self.pc == (self.pc - 1) + i_imm
                 self.update_branch_prediction(opcode, rs, rt, actual_result)
+            else:
+                self.execute(instruction)
+                self.num_cycles += 1
+                self.num_instructions += 1
+
+        self.runtime = (time.time() - start) * 1000
 
     def report(self, report_file):
         # Print the performance metrics
@@ -297,7 +326,25 @@ class TinyBASUSimulator:
         print("Number of Instructions:", self.num_instructions)
 
         with open(report_file, 'w') as file:
-            file.write('Some Report Text')
+            file.write('tiny processor report file\n')
+            file.write('simulation runtime: ' + str(self.runtime) + 'ms\n')
+            file.write('number of instructions: ' + str(self.num_instructions) + '\n')
+            file.write('number of simulation cycles: ' + str(self.num_cycles) + '\n')
+            file.write('number of executed instructions: ' + str(self.num_instructions) + '\n')
+            file.write('number of stalls: ' + str(self.num_stalls) + '\n')
+            file.write('prediction accuracy: ' + str(self.num_stalls) + '\n')
+            file.write('speedup: ' + str(self.num_stalls) + '\n')
+            file.write('\n')
+            file.write('program counter value: ' + str(self.pc) + '\n')
+            file.write('register value:\n')
+            for i, register in enumerate(self.regs):
+                file.write(f'regs[{i}]:{hex(register)}\n')
+            file.write('\nmemory content value:\n')
+            for i, mem in enumerate(self.memory):
+                if mem != 0:
+                    file.write(f'memory[{i}] = {hex(mem)}\n')
+
+            file.write('others is 0x0000')
 
 
 def tester():
