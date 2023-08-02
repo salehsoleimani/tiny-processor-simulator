@@ -16,7 +16,7 @@ def main():
     # report_file = sys.argv[5]
 
     timeout_cycles = 9999
-    prediction_method = 'SN'
+    prediction_method = 'D1'
     inst_file = "../asm/fibo_bne.asm"
     data_file = "data.txt"
     report_file = "report.txt"

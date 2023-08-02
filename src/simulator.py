@@ -54,7 +54,6 @@ class TinyBASUSimulator:
                     if fields[0][:-1] in labels.keys() and -1 in labels[fields[0][:-1]]:
                         labels[fields[0][:-1]].remove(-1)
                         for address in labels[fields[0][:-1]]:
-                            print(address)
                             previous_instruction = machine_codes[address]
                             opcode = (previous_instruction & 0xf000) >> 12
                             # editing instructions with the label specified
@@ -151,7 +150,6 @@ class TinyBASUSimulator:
 
             for address, inst in enumerate(machine_codes):
                 self.memory[address] = inst
-                print(inst)
 
     def init_memory(self, data_file):
         # Initialize the memory with content from a files
@@ -206,7 +204,6 @@ class TinyBASUSimulator:
 
         elif opcode == 0b1110:  # jmp to location
             self.pc += int(j_imm)
-            print(self.pc)
 
         elif opcode == 0b1111:  # jal to location
             self.pc += int(j_imm)
@@ -266,7 +263,6 @@ class TinyBASUSimulator:
             pass
 
     def update_branch_prediction(self, opcode, rs, rt, actual_result):
-        # Update the branch prediction table with the actual result
         if self.prediction_method == 'D1':
             key = (opcode, rs, rt)
             self.BPT[key] = actual_result
@@ -274,11 +270,10 @@ class TinyBASUSimulator:
             key = (opcode, rs, rt)
 
             if key not in self.BPT:
-                self.BPT[key] = 'WT'  # Initialize to Weakly Taken
+                self.BPT[key] = 'WT'
 
             prediction = self.BPT[key]
 
-            # Update the counter based on the actual result
             if actual_result:
                 if prediction == 'WT':
                     self.BPT[key] = 'ST'
@@ -293,11 +288,10 @@ class TinyBASUSimulator:
             key = (opcode, rs, rt)
 
             if key not in self.BPT:
-                self.BPT[key] = 'WT'  # Initialize to Weakly Taken
+                self.BPT[key] = 'WT'
 
             prediction = self.BPT[key]
 
-            # Update the counter based on the actual result
             if actual_result:
                 if prediction == 'ST':
                     self.BPT[key] = 'ST'
@@ -373,16 +367,11 @@ class TinyBASUSimulator:
 
             opcode, rd, rs, rt, func, i_imm, j_imm = self.decode(instruction)
 
-            print("asd")
-            if opcode == 11:
-                print("OK")
-
             if opcode == 10 or opcode == 11:  # implement prediction
                 # Branch instruction
                 predicted_result = self.branch_prediction(instruction)
                 if predicted_result:
                     # Taken branch
-                    print(self.pc)
                     self.pc += i_imm
                 else:
                     # Not Taken branch
@@ -395,7 +384,10 @@ class TinyBASUSimulator:
 
                 # Update branch prediction
                 # Branch instruction
-                actual_result = self.pc == (self.pc - 1) + i_imm
+                if opcode == 10:  # beq
+                    actual_result = self.regs[rs] == self.regs[rt]
+                else:  # bne
+                    actual_result = self.regs[rs] != self.regs[rt]
                 self.update_branch_prediction(opcode, rs, rt, actual_result)
             else:
                 # self.calculate_stalls()  # Calculate stalls before executing the instruction
