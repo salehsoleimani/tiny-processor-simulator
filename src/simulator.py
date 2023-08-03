@@ -11,6 +11,7 @@ class TinyBASUSimulator:
         self.memory = [0] * 512  # Initialize the memory
         self.pc = 0  # Initialize the program counter
         self.num_cycles = 0
+        self.num_instructions_executed = 0
         self.num_instructions = 0
         self.num_stalls = 0
         self.prediction_method = prediction_method
@@ -43,6 +44,8 @@ class TinyBASUSimulator:
         with open(asm_file, 'r') as file:
             lines = file.readlines()
             labels = {}
+
+            self.num_instructions = len(lines)
 
             for cnt, line in enumerate(lines):
                 fields = line.strip().split(', ')
@@ -105,7 +108,7 @@ class TinyBASUSimulator:
                                 else:
                                     # if label is defined before this instruction
                                     # store the difference between addresses to jump
-                                    imm = labels[fields[-1].strip()] - cnt + 1
+                                    imm = labels[fields[-1].strip()] - cnt - 1
                             else:
                                 # if label has been defined after instruction
                                 labels[fields[-1].strip()] = [-1, cnt]
@@ -137,7 +140,7 @@ class TinyBASUSimulator:
                                 labels[fields[-1].strip()].append(cnt)
                                 imm = 0
                             else:
-                                imm = labels[fields[-1].strip()] - cnt + 1
+                                imm = labels[fields[-1].strip()] - cnt - 1
                         else:
                             labels[fields[-1].strip()] = [-1, cnt]
                             imm = 0
@@ -203,23 +206,44 @@ class TinyBASUSimulator:
             self.memory[self.regs[rs] + int(i_imm)] = self.regs[rd]
 
         elif opcode == 0b1110:  # jmp to location
-            self.pc += int(j_imm)
+            if bin(j_imm)[2:].zfill(6)[0] == '1':
+                self.pc -= self.twos_complement_6bit(int(j_imm))
+            else:
+                self.pc += int(j_imm)
 
         elif opcode == 0b1111:  # jal to location
-            self.pc += int(j_imm)
+            if bin(j_imm)[2:].zfill(6)[0] == '1':
+                self.pc -= self.twos_complement_6bit(int(j_imm))
+            else:
+                self.pc += int(j_imm)
             self.regs[7] = self.pc
 
         elif opcode == 0x1010:  # branch equal
             if self.regs[rs] == self.regs[rt]:  # beq rd, rs, imm
-                self.pc += int(i_imm)
+                if bin(i_imm)[2:].zfill(6)[0] == '1':
+                    self.pc -= self.twos_complement_6bit(int(i_imm))
+                else:
+                    self.pc += int(i_imm)
             else:
                 self.pc += 1
 
+
         elif opcode == 0x1011:  # branch not equal
             if self.regs[rs] != self.regs[rt]:  # bne rd, rs, imm
-                self.pc += int(i_imm)
+                if bin(i_imm)[2:].zfill(6)[0] == '1':
+                    self.pc -= self.twos_complement_6bit(int(i_imm))
+                else:
+                    self.pc += int(i_imm)
             else:
                 self.pc += 1
+
+    def twos_complement_6bit(self, number):
+        binary_number = bin(number)[2:]
+        binary_number = binary_number.zfill(6)
+        inverted_number = ''.join('1' if bit == '0' else '0' for bit in binary_number)
+        twos_complement = bin(int(inverted_number, 2) + 1)[2:]
+        twos_complement = twos_complement.zfill(6)
+        return int(twos_complement, 2)
 
     def branch_prediction(self, instruction):
         # Perform branch prediction based on the selected method
@@ -366,13 +390,18 @@ class TinyBASUSimulator:
                 break  # End of the program
 
             opcode, rd, rs, rt, func, i_imm, j_imm = self.decode(instruction)
+            print(opcode)
 
             if opcode == 10 or opcode == 11:  # implement prediction
                 # Branch instruction
                 predicted_result = self.branch_prediction(instruction)
                 if predicted_result:
                     # Taken branch
-                    self.pc += i_imm
+                    self.num_stalls += 1
+                    if bin(i_imm)[2:].zfill(6)[0] == '1':
+                        self.pc -= self.twos_complement_6bit(int(i_imm))
+                    else:
+                        self.pc += int(i_imm)
                 else:
                     # Not Taken branch
                     # Execute the instruction
@@ -380,7 +409,7 @@ class TinyBASUSimulator:
                     self.execute(instruction)
                     # Update performance metrics
                     self.num_cycles += 1
-                    self.num_instructions += 1
+                    self.num_instructions_executed += 1
 
                 # Update branch prediction
                 # Branch instruction
@@ -388,21 +417,30 @@ class TinyBASUSimulator:
                     actual_result = self.regs[rs] == self.regs[rt]
                 else:  # bne
                     actual_result = self.regs[rs] != self.regs[rt]
+                # actual_result = self.pc == (self.pc - 1) + i_imm
                 self.update_branch_prediction(opcode, rs, rt, actual_result)
             else:
                 # self.calculate_stalls()  # Calculate stalls before executing the instruction
                 self.execute(instruction)
                 self.num_cycles += 1
-                self.num_instructions += 1
+                self.num_instructions_executed += 1
 
         self.runtime = (time.time() - start) * 1000
 
-    def report(self, report_file):
-        ipc = self.num_instructions / self.num_cycles if self.num_cycles > 0 else 0
+    def twos_comp(self, number):
+        binary_number = bin(number)[2:]
+        binary_number = binary_number.zfill(6)
+        inverted_number = ''.join('1' if bit == '0' else '0' for bit in binary_number)
+        twos_complement = bin(int(inverted_number, 2) + 1)[2:]
+        twos_complement = twos_complement.zfill(6)
+        return twos_complement
 
-        num_correct_predictions = self.num_instructions - self.num_stalls
+    def report(self, report_file):
+        ipc = self.num_instructions_executed / self.num_cycles if self.num_cycles > 0 else 0
+
+        num_correct_predictions = self.num_instructions_executed - self.num_stalls
         prediction_accuracy = (
-                                      num_correct_predictions / self.num_instructions) * 100 if self.num_instructions > 0 else 0
+                                      num_correct_predictions / self.num_instructions_executed) * 100 if self.num_instructions_executed > 0 else 0
 
         speedup = self.num_cycles / (self.num_cycles + self.num_stalls) if (
                                                                                    self.num_cycles + self.num_stalls) > 0 else 0
@@ -412,7 +450,7 @@ class TinyBASUSimulator:
             file.write('simulation runtime: ' + str(self.runtime) + 'ms\n')
             file.write('number of instructions: ' + str(self.num_instructions) + '\n')
             file.write('number of simulation cycles: ' + str(self.num_cycles) + '\n')
-            file.write('number of executed instructions: ' + str(self.num_instructions) + str(self.num_stalls) + '\n')
+            file.write('number of executed instructions: ' + str(self.num_instructions_executed) + '\n')
             file.write('number of stalls: ' + str(self.num_stalls) + '\n')
             file.write('prediction accuracy: ' + str(prediction_accuracy) + '\n')
             file.write('speedup: ' + str(speedup) + '\n')
