@@ -3,10 +3,21 @@ import time
 from typing import Iterable
 
 
+def twos_complement_6bit(number):
+    binary_number = bin(number)[2:]
+    binary_number = binary_number.zfill(6)
+    inverted_number = ''.join('1' if bit == '0' else '0' for bit in binary_number)
+    twos_complement = bin(int(inverted_number, 2) + 1)[2:]
+    twos_complement = twos_complement.zfill(6)
+    return int(twos_complement, 2)
+
+
 class TinyBASUSimulator:
 
     def __init__(self, prediction_method):
 
+        self.total_jumps = 0
+        self.correct_predictions = 0
         self.regs = [0] * 8  # Initialize the registers
         self.memory = [0] * 512  # Initialize the memory
         self.pc = 0  # Initialize the program counter
@@ -207,13 +218,13 @@ class TinyBASUSimulator:
 
         elif opcode == 0b1110:  # jmp to location
             if bin(j_imm)[2:].zfill(6)[0] == '1':
-                self.pc -= self.twos_complement_6bit(int(j_imm))
+                self.pc -= twos_complement_6bit(int(j_imm))
             else:
                 self.pc += int(j_imm)
 
         elif opcode == 0b1111:  # jal to location
             if bin(j_imm)[2:].zfill(6)[0] == '1':
-                self.pc -= self.twos_complement_6bit(int(j_imm))
+                self.pc -= twos_complement_6bit(int(j_imm))
             else:
                 self.pc += int(j_imm)
             self.regs[7] = self.pc
@@ -221,29 +232,20 @@ class TinyBASUSimulator:
         elif opcode == 0x1010:  # branch equal
             if self.regs[rs] == self.regs[rt]:  # beq rd, rs, imm
                 if bin(i_imm)[2:].zfill(6)[0] == '1':
-                    self.pc -= self.twos_complement_6bit(int(i_imm))
+                    self.pc -= twos_complement_6bit(int(i_imm))
                 else:
                     self.pc += int(i_imm)
             else:
                 self.pc += 1
-
 
         elif opcode == 0x1011:  # branch not equal
             if self.regs[rs] != self.regs[rt]:  # bne rd, rs, imm
                 if bin(i_imm)[2:].zfill(6)[0] == '1':
-                    self.pc -= self.twos_complement_6bit(int(i_imm))
+                    self.pc -= twos_complement_6bit(int(i_imm))
                 else:
                     self.pc += int(i_imm)
             else:
                 self.pc += 1
-
-    def twos_complement_6bit(self, number):
-        binary_number = bin(number)[2:]
-        binary_number = binary_number.zfill(6)
-        inverted_number = ''.join('1' if bit == '0' else '0' for bit in binary_number)
-        twos_complement = bin(int(inverted_number, 2) + 1)[2:]
-        twos_complement = twos_complement.zfill(6)
-        return int(twos_complement, 2)
 
     def branch_prediction(self, instruction):
         # Perform branch prediction based on the selected method
@@ -269,7 +271,7 @@ class TinyBASUSimulator:
                 return True
             elif prediction in ('SNT', 'WNT'):
                 return False
-        elif self.prediction_method == '3BIT':
+        elif self.prediction_method == 'IQ':
             opcode, rd, rs, rt, func, i_imm, j_imm = self.decode(instruction)
             key = (opcode, rs, rt)
 
@@ -308,7 +310,7 @@ class TinyBASUSimulator:
                     self.BPT[key] = 'WT'
                 elif prediction == 'WT':
                     self.BPT[key] = 'WNT'
-        elif self.prediction_method == '3BIT':
+        elif self.prediction_method == 'IQ':
             key = (opcode, rs, rt)
 
             if key not in self.BPT:
@@ -390,35 +392,35 @@ class TinyBASUSimulator:
                 break  # End of the program
 
             opcode, rd, rs, rt, func, i_imm, j_imm = self.decode(instruction)
-            print(opcode)
 
             if opcode == 10 or opcode == 11:  # implement prediction
                 # Branch instruction
                 predicted_result = self.branch_prediction(instruction)
                 if predicted_result:
                     # Taken branch
-                    self.num_stalls += 1
                     if bin(i_imm)[2:].zfill(6)[0] == '1':
-                        self.pc -= self.twos_complement_6bit(int(i_imm))
+                        self.pc -= twos_complement_6bit(int(i_imm))
                     else:
                         self.pc += int(i_imm)
+
+                    if opcode == 10:  # beq
+                        actual_result = self.regs[rs] == self.regs[rt]
+                    else:  # bne
+                        actual_result = self.regs[rs] != self.regs[rt]
+
+                    if actual_result != predicted_result:
+                        self.num_stalls += 1
+
+                    # Update branch prediction
+                    self.update_branch_prediction(opcode, rs, rt, actual_result)
                 else:
                     # Not Taken branch
                     # Execute the instruction
-                    # self.calculate_stalls()  # Calculate stalls before executing the instruction
                     self.execute(instruction)
                     # Update performance metrics
-                    self.num_cycles += 1
+                    self.num_cycles += 3
                     self.num_instructions_executed += 1
 
-                # Update branch prediction
-                # Branch instruction
-                if opcode == 10:  # beq
-                    actual_result = self.regs[rs] == self.regs[rt]
-                else:  # bne
-                    actual_result = self.regs[rs] != self.regs[rt]
-                # actual_result = self.pc == (self.pc - 1) + i_imm
-                self.update_branch_prediction(opcode, rs, rt, actual_result)
             else:
                 # self.calculate_stalls()  # Calculate stalls before executing the instruction
                 self.execute(instruction)
@@ -441,7 +443,7 @@ class TinyBASUSimulator:
         num_correct_predictions = self.num_instructions_executed - self.num_stalls
         prediction_accuracy = (
                                       num_correct_predictions / self.num_instructions_executed) * 100 if self.num_instructions_executed > 0 else 0
-
+        #   total cycles / total number of cycles that would have been required without any stalls
         speedup = self.num_cycles / (self.num_cycles + self.num_stalls) if (
                                                                                    self.num_cycles + self.num_stalls) > 0 else 0
 
@@ -466,11 +468,3 @@ class TinyBASUSimulator:
                     file.write(f'memory[{i}] = {hex(mem)}\n')
 
             file.write('others is 0x0000')
-
-
-def tester():
-    pass
-
-
-if __name__ == '__main__':
-    tester()
