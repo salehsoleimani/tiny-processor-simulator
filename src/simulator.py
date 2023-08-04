@@ -274,13 +274,13 @@ class TinyBASUSimulator:
             key = (opcode, rs, rt)
 
             if key not in self.BPT:
-                self.BPT[key] = 'WT'
+                self.BPT[key] = 'WT3'
 
             prediction = self.BPT[key]
 
-            if prediction in ('ST', 'ST_INV', 'WT', 'WT_INV'):
+            if prediction in ('ST', 'WT3', 'WT2', 'WT1'):
                 return True
-            elif prediction in ('SNT', 'SNT_INV', 'WNT', 'WNT_INV'):
+            elif prediction in ('WN3', 'WN2', 'WN1', 'SN'):
                 return False
         else:
             pass
@@ -311,45 +311,38 @@ class TinyBASUSimulator:
         elif self.prediction_method == 'IQ':
             key = (opcode, rs, rt)
 
-            if key not in self.BPT:
-                self.BPT[key] = 'WT'
-
             prediction = self.BPT[key]
 
             if actual_result:
-                if prediction == 'ST':
+                if prediction == 'WT3':
                     self.BPT[key] = 'ST'
-                elif prediction == 'ST_INV':
-                    self.BPT[key] = 'ST'
-                elif prediction == 'WT':
-                    self.BPT[key] = 'ST'
-                elif prediction == 'WT_INV':
-                    self.BPT[key] = 'ST_INV'
-                elif prediction == 'WNT':
-                    self.BPT[key] = 'WT'
-                elif prediction == 'WNT_INV':
-                    self.BPT[key] = 'WT_INV'
-                elif prediction == 'SNT':
-                    self.BPT[key] = 'WNT'
-                elif prediction == 'SNT_INV':
-                    self.BPT[key] = 'WNT_INV'
+                elif prediction == 'WT2':
+                    self.BPT[key] = 'WT3'
+                elif prediction == 'WT1':
+                    self.BPT[key] = 'WT2'
+                elif prediction == 'WN3':
+                    self.BPT[key] = 'WT1'
+                elif prediction == 'WN2':
+                    self.BPT[key] = 'WN3'
+                elif prediction == 'WN1':
+                    self.BPT[key] = 'WN2'
+                elif prediction == 'SN':
+                    self.BPT[key] = 'WN1'
             else:
-                if prediction == 'ST':
-                    self.BPT[key] = 'ST_INV'
-                elif prediction == 'ST_INV':
-                    self.BPT[key] = 'WNT_INV'
-                elif prediction == 'WT':
-                    self.BPT[key] = 'WT_INV'
-                elif prediction == 'WT_INV':
-                    self.BPT[key] = 'SNT_INV'
-                elif prediction == 'WNT':
-                    self.BPT[key] = 'WNT_INV'
-                elif prediction == 'WNT_INV':
-                    self.BPT[key] = 'SNT_INV'
-                elif prediction == 'SNT':
-                    self.BPT[key] = 'SNT_INV'
-                elif prediction == 'SNT_INV':
-                    self.BPT[key] = 'SNT_INV'
+                if prediction == 'SN':
+                    self.BPT[key] = 'WN1'
+                elif prediction == 'WN1':
+                    self.BPT[key] = 'WN2'
+                elif prediction == 'WN2':
+                    self.BPT[key] = 'WN3'
+                elif prediction == 'WN3':
+                    self.BPT[key] = 'WT1'
+                elif prediction == 'WT1':
+                    self.BPT[key] = 'WT2'
+                elif prediction == 'WT2':
+                    self.BPT[key] = 'WT3'
+                elif prediction == 'WT3':
+                    self.BPT[key] = 'ST'
 
     def run(self, timeout):
         start = time.time()
