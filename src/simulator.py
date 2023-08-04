@@ -261,11 +261,10 @@ class TinyBASUSimulator:
             key = (opcode, rs, rt)
 
             if key not in self.BPT:
-                self.BPT[key] = 'WT'  # Initialize to Weakly Taken
+                self.BPT[key] = 'WT'
 
             prediction = self.BPT[key]
 
-            # Predict based on the current state of the counter
             if prediction in ('ST', 'WT'):
                 return True
             elif prediction in ('SNT', 'WNT'):
@@ -275,11 +274,10 @@ class TinyBASUSimulator:
             key = (opcode, rs, rt)
 
             if key not in self.BPT:
-                self.BPT[key] = 'WT'  # Initialize to Weakly Taken
+                self.BPT[key] = 'WT'
 
             prediction = self.BPT[key]
 
-            # Predict based on the current state of the counter
             if prediction in ('ST', 'ST_INV', 'WT', 'WT_INV'):
                 return True
             elif prediction in ('SNT', 'SNT_INV', 'WNT', 'WNT_INV'):
@@ -294,9 +292,6 @@ class TinyBASUSimulator:
         elif self.prediction_method == 'D2':
             key = (opcode, rs, rt)
 
-            if key not in self.BPT:
-                self.BPT[key] = 'WT'
-
             prediction = self.BPT[key]
 
             if actual_result:
@@ -304,11 +299,15 @@ class TinyBASUSimulator:
                     self.BPT[key] = 'ST'
                 elif prediction == 'WNT':
                     self.BPT[key] = 'WT'
+                elif prediction == 'SNT':
+                    self.BPT[key] = 'WNT'
             else:
                 if prediction == 'ST':
                     self.BPT[key] = 'WT'
                 elif prediction == 'WT':
                     self.BPT[key] = 'WNT'
+                elif prediction == 'WNT':
+                    self.BPT[key] = 'SNT'
         elif self.prediction_method == 'IQ':
             key = (opcode, rs, rt)
 
@@ -366,8 +365,6 @@ class TinyBASUSimulator:
 
             opcode, rd, rs, rt, func, i_imm, j_imm = self.decode(instruction)
 
-            # print(opcode)
-
             if opcode == 10 or opcode == 11:  # implement prediction
                 # Branch instruction
                 predicted_result = self.branch_prediction(instruction)
@@ -396,6 +393,12 @@ class TinyBASUSimulator:
 
                 # Update branch prediction
                 self.update_branch_prediction(opcode, rs, rt, actual_result)
+
+                print("predicted result was: ",
+                      predicted_result, " and actual result was: ", actual_result)
+                if (opcode, rs, rt) in self.BPT.keys():
+                    print("current state is:", self.BPT[(opcode, rs, rt)])
+
 
             else:
                 # self.calculate_stalls()  # Calculate stalls before executing the instruction
