@@ -387,10 +387,10 @@ class TinyBASUSimulator:
                 # Update branch prediction
                 self.update_branch_prediction(opcode, rs, rt, actual_result)
 
-                print("predicted result was: ",
-                      predicted_result, " and actual result was: ", actual_result)
-                if (opcode, rs, rt) in self.BPT.keys():
-                    print("current state is:", self.BPT[(opcode, rs, rt)])
+                # print("predicted result was: ",
+                #       predicted_result, " and actual result was: ", actual_result)
+                # if (opcode, rs, rt) in self.BPT.keys():
+                #     print("current state is:", self.BPT[(opcode, rs, rt)])
 
 
             else:
