@@ -1,4 +1,4 @@
-main: lui rx6, 1
+lui rx6, 1
   li rx1, 1
   lui rx0, 0
   addi rx2, rx0, 30

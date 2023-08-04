@@ -1,4 +1,3 @@
-import curses.ascii
 import time
 from typing import Iterable
 
@@ -230,7 +229,7 @@ class TinyBASUSimulator:
             self.regs[7] = self.pc
 
         elif opcode == 0x1010:  # branch equal
-            if self.regs[rs] == self.regs[rt]:  # beq rd, rs, imm
+            if self.regs[rs] == self.regs[rd]:  # beq rd, rs, imm
                 if bin(i_imm)[2:].zfill(6)[0] == '1':
                     self.pc -= twos_complement_6bit(int(i_imm))
                 else:
@@ -239,7 +238,7 @@ class TinyBASUSimulator:
                 self.pc += 1
 
         elif opcode == 0x1011:  # branch not equal
-            if self.regs[rs] != self.regs[rt]:  # bne rd, rs, imm
+            if self.regs[rs] != self.regs[rd]:  # bne rd, rs, imm
                 if bin(i_imm)[2:].zfill(6)[0] == '1':
                     self.pc -= twos_complement_6bit(int(i_imm))
                 else:
@@ -353,32 +352,6 @@ class TinyBASUSimulator:
                 elif prediction == 'SNT_INV':
                     self.BPT[key] = 'SNT_INV'
 
-    def calculate_stalls(self):
-        # Initialize a dictionary to track the completion cycle of each register write
-        register_write_cycles = {}
-
-        for cycle in range(self.num_cycles):
-            instruction = self.memory[self.pc - 1]  # Fetch the instruction being executed in the current cycle
-            opcode, rd, rs, rt, func, i_imm, j_imm = self.decode(instruction)
-
-            # Check for data hazards (use-after-write)
-            if opcode in [0b001, 0b010, 0b100, 0b0001]:  # Instructions that write to registers (add, sub, slt, addi)
-                if rs in register_write_cycles and register_write_cycles[rs] > cycle:
-                    # Hazard detected, need to stall
-                    self.num_stalls += 1
-                if rt in register_write_cycles and register_write_cycles[rt] > cycle:
-                    # Hazard detected, need to stall
-                    self.num_stalls += 1
-
-            # Update register_write_cycles with the completion cycle of the current instruction
-            if opcode in [0b001, 0b010, 0b100, 0b0001]:
-                # Instructions that write to registers (add, sub, slt, addi)
-                register_write_cycles[rd] = cycle + 1
-
-            # Execute the instruction and update PC
-            self.execute(instruction)
-            self.pc += 1
-
     def run(self, timeout):
         start = time.time()
         while True:
@@ -393,6 +366,8 @@ class TinyBASUSimulator:
 
             opcode, rd, rs, rt, func, i_imm, j_imm = self.decode(instruction)
 
+            # print(opcode)
+
             if opcode == 10 or opcode == 11:  # implement prediction
                 # Branch instruction
                 predicted_result = self.branch_prediction(instruction)
@@ -403,16 +378,6 @@ class TinyBASUSimulator:
                     else:
                         self.pc += int(i_imm)
 
-                    if opcode == 10:  # beq
-                        actual_result = self.regs[rs] == self.regs[rt]
-                    else:  # bne
-                        actual_result = self.regs[rs] != self.regs[rt]
-
-                    if actual_result != predicted_result:
-                        self.num_stalls += 1
-
-                    # Update branch prediction
-                    self.update_branch_prediction(opcode, rs, rt, actual_result)
                 else:
                     # Not Taken branch
                     # Execute the instruction
@@ -420,6 +385,17 @@ class TinyBASUSimulator:
                     # Update performance metrics
                     self.num_cycles += 3
                     self.num_instructions_executed += 1
+
+                if opcode == 10:  # beq
+                    actual_result = self.regs[rs] == self.regs[rd]
+                else:  # bne
+                    actual_result = self.regs[rs] != self.regs[rd]
+
+                if actual_result != predicted_result:
+                    self.num_stalls += 1
+
+                # Update branch prediction
+                self.update_branch_prediction(opcode, rs, rt, actual_result)
 
             else:
                 # self.calculate_stalls()  # Calculate stalls before executing the instruction
