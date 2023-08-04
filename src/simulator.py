@@ -11,6 +11,11 @@ def twos_complement_6bit(number):
     return int(twos_complement, 2)
 
 
+def sign_extend(value, bits):
+    sign_bit = 1 << (bits - 1)
+    return (value & (sign_bit - 1)) - (value & sign_bit)
+
+
 class TinyBASUSimulator:
 
     def __init__(self, prediction_method):
@@ -35,7 +40,11 @@ class TinyBASUSimulator:
         func = {
             'add': 0b001,
             'sub': 0b010,
-            'slt': 0b100
+            'slt': 0b100,
+            'mul': 0b011,  # Optional
+            'div': 0b101,  # Optional
+            'slly': 0b000,  # Optional
+            'srly': 0b110,  # Optional
         }
         i_opcodes = {
             'addi': 0b0001,
@@ -44,7 +53,10 @@ class TinyBASUSimulator:
             'lw': 0b0100,
             'sw': 0b0101,
             'beq': 0b1010,
-            'bne': 0b1011
+            'bne': 0b1011,
+            'sll': 0b0111,  # Optional
+            'srl': 0b1001,  # Optional
+            'sra': 0b1100,  # Optional
         }
         j_opcode = {
             'jmp': 0b1110,
@@ -88,7 +100,7 @@ class TinyBASUSimulator:
                     labels[fields[0][:-1]] = cnt
                     fields.pop(0)
                 instruction = 0x0000
-                if fields[0] in ['add', 'sub', 'slt']:
+                if fields[0] in ['add', 'sub', 'slt', 'mul', 'div', 'slly', 'srly']:
                     opcode = 0
                     rd = int(fields[1][2:]) if nf > 2 else 0
                     rs = int(fields[2][2:]) if nf > 1 else 0
@@ -100,7 +112,8 @@ class TinyBASUSimulator:
                     instruction += (rt << 3) & 0x0038
                     instruction += funct & 0x0007
                     machine_codes.append(instruction)
-                elif fields[0] in ['addi', 'beq', 'bne', 'sw', 'lw']:
+
+                elif fields[0] in ['addi', 'beq', 'bne', 'sw', 'lw', 'sll', 'srl', 'sra']:
                     opcode = i_opcodes[fields[0]]
                     rd = int(fields[1][2:]) if nf > 1 else 0
                     rs = int(fields[2][2:]) if nf > 1 else 0
@@ -191,14 +204,27 @@ class TinyBASUSimulator:
         opcode, rd, rs, rt, func, i_imm, j_imm = self.decode(instruction)
 
         if opcode == 0:
-            if func == 1:  # add
+
+            if func == 0:  # slly
+                self.regs[rd] = self.regs[rs] << self.regs[rt]
+
+            elif func == 1:  # add
                 self.regs[rd] = self.regs[rs] + self.regs[rt]  # add rd, rs, rt
 
             elif func == 2:  # sub
                 self.regs[rd] = self.regs[rs] - self.regs[rt]  # sub rd, rs, rt
 
+            elif func == 3:  # mul
+                self.regs[rd] = self.regs[rs] * self.regs[rt]
+
             elif func == 4:  # slt
                 self.regs[rd] = 1 if self.regs[rs] < self.regs[rt] else 0
+
+            elif func == 5:  # div
+                self.regs[rd] = self.regs[rs] / self.regs[rt]
+
+            elif func == 6:  # srly
+                self.regs[rd] = self.regs[rs] >> self.regs[rt]
 
         elif opcode == 1:  # addi
             self.regs[rd] = self.regs[rs] + int(i_imm)  # addi rd, rs, imm
@@ -214,6 +240,15 @@ class TinyBASUSimulator:
 
         elif opcode == 5:  # sw: store word
             self.memory[self.regs[rs] + int(i_imm)] = self.regs[rd]
+
+        elif opcode == 7:  # sll
+            self.regs[rd] = self.regs[rs] << int(i_imm)
+
+        elif opcode == 9:  # srl
+            self.regs[rd] = self.regs[rs] >> int(i_imm)
+
+        elif opcode == 12:  # sra
+            self.regs[rd] = sign_extend(self.regs[rs], int(i_imm))
 
         elif opcode == 0b1110:  # jmp to location
             if bin(j_imm)[2:].zfill(6)[0] == '1':

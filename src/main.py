@@ -17,7 +17,7 @@ def main():
 
     # timeout_cycles = 30
     # prediction_method = 'IQ'
-    # inst_file = "../asm/fibo_beq.asm"
+    # inst_file = "../asm/fact.asm"
     # data_file = "../data.txt"
     # report_file = "report.txt"
 
