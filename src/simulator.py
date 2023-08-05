@@ -441,14 +441,6 @@ class TinyBASUSimulator:
 
         self.runtime = (time.time() - start) * 1000
 
-    def twos_comp(self, number):
-        binary_number = bin(number)[2:]
-        binary_number = binary_number.zfill(6)
-        inverted_number = ''.join('1' if bit == '0' else '0' for bit in binary_number)
-        twos_complement = bin(int(inverted_number, 2) + 1)[2:]
-        twos_complement = twos_complement.zfill(6)
-        return twos_complement
-
     def report(self, report_file):
         ipc = self.num_instructions_executed / self.num_cycles if self.num_cycles > 0 else 0
 
