@@ -2,13 +2,13 @@ import time
 from typing import Iterable
 
 
-def twos_complement_6bit(number):
+def twos_complement(number, len_bits=6):
     binary_number = bin(number)[2:]
-    binary_number = binary_number.zfill(6)
+    binary_number = binary_number.zfill(len_bits)
     inverted_number = ''.join('1' if bit == '0' else '0' for bit in binary_number)
-    twos_complement = bin(int(inverted_number, 2) + 1)[2:]
-    twos_complement = twos_complement.zfill(6)
-    return int(twos_complement, 2)
+    twos = bin(int(inverted_number, 2) + 1)[2:]
+    twos = twos.zfill(len_bits)
+    return int(twos, 2)
 
 
 def sign_extend(value, bits):
@@ -252,13 +252,13 @@ class TinyBASUSimulator:
 
         elif opcode == 0b1110:  # jmp to location
             if bin(j_imm)[2:].zfill(6)[0] == '1':
-                self.pc -= twos_complement_6bit(int(j_imm))
+                self.pc -= twos_complement(int(j_imm), len_bits=12)
             else:
                 self.pc += int(j_imm)
 
         elif opcode == 0b1111:  # jal to location
             if bin(j_imm)[2:].zfill(6)[0] == '1':
-                self.pc -= twos_complement_6bit(int(j_imm))
+                self.pc -= twos_complement(int(j_imm), len_bits=12)
             else:
                 self.pc += int(j_imm)
             self.regs[7] = self.pc + 1
@@ -266,7 +266,7 @@ class TinyBASUSimulator:
         elif opcode == 0x1010:  # branch equal
             if self.regs[rs] == self.regs[rd]:  # beq rd, rs, imm
                 if bin(i_imm)[2:].zfill(6)[0] == '1':
-                    self.pc -= twos_complement_6bit(int(i_imm))
+                    self.pc -= twos_complement(int(i_imm))
                 else:
                     self.pc += int(i_imm)
             else:
@@ -275,7 +275,7 @@ class TinyBASUSimulator:
         elif opcode == 0x1011:  # branch not equal
             if self.regs[rs] != self.regs[rd]:  # bne rd, rs, imm
                 if bin(i_imm)[2:].zfill(6)[0] == '1':
-                    self.pc -= twos_complement_6bit(int(i_imm))
+                    self.pc -= twos_complement(int(i_imm))
                 else:
                     self.pc += int(i_imm)
             else:
@@ -399,7 +399,7 @@ class TinyBASUSimulator:
                 if predicted_result:
                     # Taken branch
                     if bin(i_imm)[2:].zfill(6)[0] == '1':
-                        self.pc -= twos_complement_6bit(int(i_imm))
+                        self.pc -= twos_complement(int(i_imm))
                     else:
                         self.pc += int(i_imm)
 
