@@ -251,13 +251,13 @@ class TinyBASUSimulator:
             self.regs[rd] = sign_extend(self.regs[rs], int(i_imm))
 
         elif opcode == 0b1110:  # jmp to location
-            if bin(j_imm)[2:].zfill(6)[0] == '1':
+            if bin(j_imm)[2:].zfill(12)[0] == '1':
                 self.pc -= twos_complement(int(j_imm), len_bits=12)
             else:
                 self.pc += int(j_imm)
 
         elif opcode == 0b1111:  # jal to location
-            if bin(j_imm)[2:].zfill(6)[0] == '1':
+            if bin(j_imm)[2:].zfill(12)[0] == '1':
                 self.pc -= twos_complement(int(j_imm), len_bits=12)
             else:
                 self.pc += int(j_imm)
