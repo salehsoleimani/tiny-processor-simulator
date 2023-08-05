@@ -31,7 +31,7 @@ class TinyBASUSimulator:
         self.num_stalls = 0
         self.prediction_method = prediction_method
         self.BPT = {}  # Branch Prediction Table
-
+        self.flush = 0
         self.runtime = 0
 
     def parse_instruction(self, asm_file):
@@ -96,11 +96,11 @@ class TinyBASUSimulator:
                                 instruction += (rd << 9) & 0x0e00
                                 instruction += (rs << 6) & 0x01c0
                                 machine_codes[address] = instruction
-
                     labels[fields[0][:-1]] = cnt
                     fields.pop(0)
                 instruction = 0x0000
                 if fields[0] in ['add', 'sub', 'slt', 'mul', 'div', 'slly', 'srly']:
+
                     opcode = 0
                     rd = int(fields[1][2:]) if nf > 2 else 0
                     rs = int(fields[2][2:]) if nf > 1 else 0
@@ -114,6 +114,8 @@ class TinyBASUSimulator:
                     machine_codes.append(instruction)
 
                 elif fields[0] in ['addi', 'beq', 'bne', 'sw', 'lw', 'sll', 'srl', 'sra']:
+                    # addi rx3, rx0, 1
+
                     opcode = i_opcodes[fields[0]]
                     rd = int(fields[1][2:]) if nf > 1 else 0
                     rs = int(fields[2][2:]) if nf > 1 else 0
@@ -309,7 +311,7 @@ class TinyBASUSimulator:
             key = (opcode, rs, rt)
 
             if key not in self.BPT:
-                self.BPT[key] = 'WT3'
+                self.BPT[key] = 'SN'
 
             prediction = self.BPT[key]
 
@@ -397,12 +399,15 @@ class TinyBASUSimulator:
                 # Branch instruction
                 predicted_result = self.branch_prediction(instruction)
                 if predicted_result:
+                    self.flush += 3
+
                     # Taken branch
                     if bin(i_imm)[2:].zfill(6)[0] == '1':
                         self.pc -= twos_complement(int(i_imm))
                     else:
                         self.pc += int(i_imm)
 
+                    self.num_stalls += 1
                 else:
                     # Not Taken branch
                     # Execute the instruction
@@ -416,8 +421,8 @@ class TinyBASUSimulator:
                 else:  # bne
                     actual_result = self.regs[rs] != self.regs[rd]
 
-                if actual_result != predicted_result:
-                    self.num_stalls += 1
+                # if actual_result != predicted_result:
+                #     self.num_stalls += 1
 
                 # Update branch prediction
                 self.update_branch_prediction(opcode, rs, rt, actual_result)
