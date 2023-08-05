@@ -261,7 +261,7 @@ class TinyBASUSimulator:
                 self.pc -= twos_complement_6bit(int(j_imm))
             else:
                 self.pc += int(j_imm)
-            self.regs[7] = self.pc
+            self.regs[7] = self.pc + 1
 
         elif opcode == 0x1010:  # branch equal
             if self.regs[rs] == self.regs[rd]:  # beq rd, rs, imm
