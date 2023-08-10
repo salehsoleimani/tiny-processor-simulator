@@ -409,6 +409,7 @@ class TinyBASUSimulator:
 
                     self.num_stalls += 1
                 else:
+                    instruction = self.fetch()
                     # Not Taken branch
                     # Execute the instruction
                     self.execute(instruction)
@@ -421,20 +422,10 @@ class TinyBASUSimulator:
                 else:  # bne
                     actual_result = self.regs[rs] != self.regs[rd]
 
-                # if actual_result != predicted_result:
-                #     self.num_stalls += 1
-
                 # Update branch prediction
                 self.update_branch_prediction(opcode, rs, rt, actual_result)
 
-                # print("predicted result was: ",
-                #       predicted_result, " and actual result was: ", actual_result)
-                # if (opcode, rs, rt) in self.BPT.keys():
-                #     print("current state is:", self.BPT[(opcode, rs, rt)])
-
-
             else:
-                # self.calculate_stalls()  # Calculate stalls before executing the instruction
                 self.execute(instruction)
                 self.num_cycles += 1
                 self.num_instructions_executed += 1
@@ -447,7 +438,7 @@ class TinyBASUSimulator:
         num_correct_predictions = self.num_instructions_executed - self.num_stalls
         prediction_accuracy = (
                                       num_correct_predictions / self.num_instructions_executed) * 100 if self.num_instructions_executed > 0 else 0
-        #   total cycles / total number of cycles that would have been required without any stalls
+        #   total cycles / total number of cycles that would've been required without any stalls
         speedup = self.num_cycles / (self.num_cycles + self.num_stalls) if (
                                                                                    self.num_cycles + self.num_stalls) > 0 else 0
 
